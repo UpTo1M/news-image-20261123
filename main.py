@@ -1,10 +1,8 @@
-"""Copy the pre-built v2 front page to /output/entry.png.
+"""Copy the pre-built entry image to the output directory.
 
-The image is drawn at build time (see README.md): a 1024x1024 PNG that
-sums up Monday 23 November 2026 in six verified stories, with the COP31
-collapse as the dominant lead. The grader runs this program with no
-network, so it only copies the bundled PNG -- standard library only,
-deterministic, byte-identical on every run.
+The image (entry.png, 1024x1024) is drawn at build time; this program
+only copies it to /output/entry.png, deterministically, using the
+Python standard library. No network, no writes to the bot directory.
 """
 
 import hashlib
@@ -12,26 +10,30 @@ import os
 import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.join(HERE, "entry.png")
-DST = "/output/entry.png"
+SOURCE = os.path.join(HERE, "entry.png")
+DEST_DIR = "/output"
+DEST = os.path.join(DEST_DIR, "entry.png")
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def main():
-    if not os.path.isfile(SRC):
-        raise FileNotFoundError(f"bundled image missing: {SRC}")
-    os.makedirs("/output", exist_ok=True)
-    shutil.copyfile(SRC, DST)
-    # Guard: the grader must see exactly the bytes we built. A size
-    # check alone cannot catch a truncated copy, so compare SHA-256.
-    def _sha256(path):
-        h = hashlib.sha256()
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""):
-                h.update(chunk)
-        return h.digest()
-
-    if _sha256(SRC) != _sha256(DST):
-        raise RuntimeError("copied entry.png differs from the source")
+    if not os.path.isfile(SOURCE):
+        raise SystemExit("missing source image: " + SOURCE)
+    expected_size = os.path.getsize(SOURCE)
+    os.makedirs(DEST_DIR, exist_ok=True)
+    shutil.copyfile(SOURCE, DEST)
+    if os.path.getsize(DEST) != expected_size:
+        raise SystemExit("copy failed: size mismatch after copy")
+    if sha256(SOURCE) != sha256(DEST):
+        raise SystemExit("copy failed: hash mismatch after copy")
+    print("wrote", DEST, "(%d bytes)" % expected_size)
 
 
 if __name__ == "__main__":
